@@ -127,6 +127,89 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
             f"❌ Ein Fehler ist aufgetreten: {str(error)}",
             ephemeral=True
         )
+CONFIG_FILE = "config.json"
+COOLDOWNS_FILE = "cooldowns.json"
+
+def load_json(filename):
+    if os.path.exists(filename):
+        try:
+            with open(filename, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Fehler beim Laden von {filename}: {e}")
+            return {}
+    return {}
+
+def format_timedelta(td):
+    total_seconds = int(td.total_seconds())
+    days = total_seconds // 86400
+    hours = (total_seconds % 86400) // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+
+    parts = []
+    if days > 0:
+        parts.append(f"{days} Tag{'e' if days != 1 else ''}")
+    if hours > 0:
+        parts.append(f"{hours} Stunde{'n' if hours != 1 else ''}")
+    if minutes > 0:
+        parts.append(f"{minutes} Minute{'n' if minutes != 1 else ''}")
+    if seconds > 0 and not parts:
+        parts.append(f"{seconds} Sekunde{'n' if seconds != 1 else ''}")
+    
+    return ", ".join(parts) if parts else "0 Sekunden"
+
+# --- Slash-Command ---
+
+
+# cooldown-show-command
+
+@bot.tree.command(name="show-cooldowns", description="Zeige alle aktiven Cooldowns pro Rolle und Channel")
+@app_commands.checks.has_permissions(administrator=True)
+async def show_cooldowns(interaction: discord.Interaction):
+    config = load_json(CONFIG_FILE)
+    cooldowns = load_json(COOLDOWNS_FILE)
+
+    if not config:
+        await interaction.response.send_message("Keine Cooldowns konfiguriert.", ephemeral=True)
+        return
+
+    lines = []
+    for key, rule in config.items():
+        guild = interaction.guild
+        channel = guild.get_channel(rule["channel_id"])
+        role = guild.get_role(rule["role_id"])
+        interval = rule["interval"]
+        interval_seconds = rule["interval_seconds"]
+
+        # Zähle, wie viele User gerade im Cooldown sind
+        active_users = []
+        for user_key, timestamp in cooldowns.items():
+            parts = user_key.split("_")
+            if len(parts) != 4:
+                continue
+            g_id, c_id, r_id, u_id = parts
+            if int(g_id) == guild.id and int(c_id) == channel.id and int(r_id) == role.id:
+                last_time = datetime.fromisoformat(timestamp)
+                remaining = timedelta(seconds=interval_seconds) - (datetime.now() - last_time)
+                if remaining.total_seconds() > 0:
+                    member = guild.get_member(int(u_id))
+                    if member:
+                        active_users.append(f"{member.display_name} ({format_timedelta(remaining)})")
+
+        lines.append(f"**Channel:** {channel.mention} | **Rolle:** {role.mention} | Intervall: {interval}\n"
+                     f"Aktive Cooldowns: {len(active_users)}\n"
+                     + ("\n".join(active_users) if active_users else "Keine aktiven User") + "\n")
+
+    message = "\n".join(lines)
+    if len(message) > 2000:  # Discord Nachrichtenlimit
+        message = message[:1990] + "\n…"
+
+    await interaction.response.send_message(message, ephemeral=True)
+
+
+# Cooldown-set-command
+
 
 @bot.tree.command(name="set-window", description="Setze ein Message-Cooldown-Fenster für eine Rolle in einem Channel")
 @app_commands.describe(
@@ -241,6 +324,7 @@ if not token:
 else:
     keep_alive()
     bot.run(token)
+
 
 
 
