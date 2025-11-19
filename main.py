@@ -170,32 +170,32 @@ async def set_window(interaction: discord.Interaction, role: discord.Role, chann
 @bot.event
 async def on_message(message):
     try:
-async def on_message(message):
-    if message.author.bot:
-        return
+        async def on_message(message):
+            if message.author.bot:
+                return
     
-    await bot.process_commands(message)
+            await bot.process_commands(message)
     
-    if not message.guild:
-        return
+            if not message.guild:
+                return
     
-    config = load_json(CONFIG_FILE)
-    cooldowns = load_json(COOLDOWNS_FILE)
+            config = load_json(CONFIG_FILE)
+            cooldowns = load_json(COOLDOWNS_FILE)
     
-    # Alle Regeln im aktuellen Channel für aktuelle Guild
-    applicable_rules = [
-        rule for key, rule in config.items()
-        if rule["channel_id"] == message.channel.id and rule["guild_id"] == message.guild.id
-    ]
+            # Alle Regeln im aktuellen Channel für aktuelle Guild
+            applicable_rules = [
+                rule for key, rule in config.items()
+                if rule["channel_id"] == message.channel.id and rule["guild_id"] == message.guild.id
+            ]
     
-    # Sammle alle Rollen des Users, die eine Regel haben
-    user_roles_with_rules = [
-        rule for rule in applicable_rules
-        if any(r.id == rule["role_id"] for r in message.author.roles)
-    ]
+            # Sammle alle Rollen des Users, die eine Regel haben
+            user_roles_with_rules = [
+                rule for rule in applicable_rules
+                if any(r.id == rule["role_id"] for r in message.author.roles)
+            ]
     
-    if not user_roles_with_rules:
-        return  # keine Regel für diese Rollen
+            if not user_roles_with_rules:
+                return  # keine Regel für diese Rollen
     
     # Wähle die Rolle mit dem KÜRZESTEN Cooldown
     rule_to_apply = min(user_roles_with_rules, key=lambda r: r["interval_seconds"])
@@ -240,6 +240,7 @@ if not token:
 else:
     keep_alive()
     bot.run(token)
+
 
 
 
