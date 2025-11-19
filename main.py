@@ -8,6 +8,16 @@ import re
 from flask import Flask
 from threading import Thread
 
+with open("cooldowns.json", "r") as f:
+    try:
+        json.load(f)
+    except json.JSONDecodeError:
+        print("❌ cooldowns.json defekt, erstelle Backup")
+        import shutil
+        shutil.copy("cooldowns.json", "cooldowns.json.bak")
+        open("cooldowns.json", "w").write("{}")
+
+
 app = Flask("")
 
 @app.route("/")
@@ -230,6 +240,7 @@ if not token:
 else:
     keep_alive()
     bot.run(token)
+
 
 
 
