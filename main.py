@@ -15,8 +15,13 @@ def home():
     return "Bot läuft!"
 
 def run():
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
+def keep_alive():
+    t = Thread(target=run)
+    t.daemon = True  # wichtig, sonst blockiert Thread
+    t.start()
+    
 t = Thread(target=run)
 t.start()
 
@@ -203,8 +208,7 @@ async def on_message(message):
 token = os.getenv('DISCORD_BOT_TOKEN')
 if not token:
     print("❌ FEHLER: DISCORD_BOT_TOKEN nicht gefunden!")
-    print("Bitte setze den Bot-Token in den Replit Secrets.")
 else:
-    
     keep_alive()
     bot.run(token)
+
