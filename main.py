@@ -206,4 +206,5 @@ if not token:
     print("Bitte setze den Bot-Token in den Replit Secrets.")
 else:
     
+    keep_alive()
     bot.run(token)
