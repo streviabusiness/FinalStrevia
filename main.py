@@ -159,6 +159,8 @@ async def set_window(interaction: discord.Interaction, role: discord.Role, chann
 
 @bot.event
 async def on_message(message):
+    try:
+async def on_message(message):
     if message.author.bot:
         return
     
@@ -219,7 +221,8 @@ async def on_message(message):
     # Cooldown starten / aktualisieren
     cooldowns[user_key] = datetime.now().isoformat()
     save_json(COOLDOWNS_FILE, cooldowns)
-
+    except Exception as e:
+        print(f"❌ Fehler in on_message: {e}")
 
 token = os.getenv('DISCORD_BOT_TOKEN')
 if not token:
@@ -227,5 +230,6 @@ if not token:
 else:
     keep_alive()
     bot.run(token)
+
 
 
