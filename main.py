@@ -170,40 +170,56 @@ async def on_message(message):
     config = load_json(CONFIG_FILE)
     cooldowns = load_json(COOLDOWNS_FILE)
     
-    for key, rule in config.items():
-        if rule["channel_id"] == message.channel.id and rule["guild_id"] == message.guild.id:
-            role_id = rule["role_id"]
+    # Alle Regeln im aktuellen Channel für aktuelle Guild
+    applicable_rules = [
+        rule for key, rule in config.items()
+        if rule["channel_id"] == message.channel.id and rule["guild_id"] == message.guild.id
+    ]
+    
+    # Sammle alle Rollen des Users, die eine Regel haben
+    user_roles_with_rules = [
+        rule for rule in applicable_rules
+        if any(r.id == rule["role_id"] for r in message.author.roles)
+    ]
+    
+    if not user_roles_with_rules:
+        return  # keine Regel für diese Rollen
+    
+    # Wähle die Rolle mit dem KÜRZESTEN Cooldown
+    rule_to_apply = min(user_roles_with_rules, key=lambda r: r["interval_seconds"])
+    role_id = rule_to_apply["role_id"]
+    
+    # user_key jetzt rollenabhängig
+    user_key = f"{message.guild.id}_{message.channel.id}_{role_id}_{message.author.id}"
+    
+    # Prüfen, ob Cooldown aktiv ist
+    if user_key in cooldowns:
+        try:
+            last_message_time = datetime.fromisoformat(cooldowns[user_key])
+            interval_seconds = rule_to_apply["interval_seconds"]
+            time_passed = (datetime.now() - last_message_time).total_seconds()
             
-            if any(r.id == role_id for r in message.author.roles):
-                user_key = f"{message.guild.id}_{message.channel.id}_{message.author.id}"
+            if time_passed < interval_seconds:
+                remaining = timedelta(seconds=interval_seconds - time_passed)
                 
-                if user_key in cooldowns:
-                    try:
-                        last_message_time = datetime.fromisoformat(cooldowns[user_key])
-                        interval_seconds = rule["interval_seconds"]
-                        time_passed = (datetime.now() - last_message_time).total_seconds()
-                        
-                        if time_passed < interval_seconds:
-                            remaining = timedelta(seconds=interval_seconds - time_passed)
-                            
-                            try:
-                                await message.delete()
-                                warning = await message.channel.send(
-                                    f"⏳ {message.author.mention}, du kannst erst in **{format_timedelta(remaining)}** wieder schreiben!"
-                                )
-                                await warning.delete(delay=5)
-                            except discord.Forbidden:
-                                print(f"Keine Berechtigung, Nachricht von {message.author} zu löschen")
-                            
-                            return
-                    except (ValueError, KeyError) as e:
-                        print(f"❌ Fehler beim Parsen des Cooldown-Zeitstempels für {user_key}: {e}")
-                        print(f"Setze Cooldown zurück für diesen User")
-                        del cooldowns[user_key]
+                try:
+                    await message.delete()
+                    warning = await message.channel.send(
+                        f"⏳ {message.author.mention}, du kannst erst in **{format_timedelta(remaining)}** wieder schreiben!"
+                    )
+                    await warning.delete(delay=5)
+                except discord.Forbidden:
+                    print(f"Keine Berechtigung, Nachricht von {message.author} zu löschen")
                 
-                cooldowns[user_key] = datetime.now().isoformat()
-                save_json(COOLDOWNS_FILE, cooldowns)
-                break
+                return
+        except (ValueError, KeyError) as e:
+            print(f"❌ Fehler beim Parsen des Cooldown-Zeitstempels für {user_key}: {e}")
+            del cooldowns[user_key]
+    
+    # Cooldown starten / aktualisieren
+    cooldowns[user_key] = datetime.now().isoformat()
+    save_json(COOLDOWNS_FILE, cooldowns)
+
 
 token = os.getenv('DISCORD_BOT_TOKEN')
 if not token:
@@ -211,4 +227,5 @@ if not token:
 else:
     keep_alive()
     bot.run(token)
+
 
